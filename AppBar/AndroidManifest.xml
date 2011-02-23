@@ -9,15 +9,18 @@
     <uses-permission android:name="android.permission.GET_TASKS"></uses-permission>
 
     <application android:icon="@drawable/icon" android:label="@string/app_name">
-        <activity android:name=".AppBarConfigActivity"
-                  android:label="@string/app_name">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN" />
-                <category android:name="android.intent.category.LAUNCHER" />
+        <receiver android:name="AppBarStarter" android:enabled="true">
+        	<intent-filter>
+				<action android:name="android.intent.action.BOOT_COMPLETED"/>
+				<action android:name="android.intent.action.USER_PRESENT"/>
+				<category android:name="android.intent.category.HOME" />
             </intent-filter>
-        </activity>
-        <receiver android:name="AppBarStarter" android:enabled="true"></receiver>
-        <service android:enabled="true" android:name="AppBarService"></service>
+        </receiver>
+        <service android:enabled="true" android:name="AppBarService">
+        	<intent-filter>
+        		<action android:name="de.ubuntudroid.appbar.AppBarService"/>
+        	</intent-filter>
+        </service>
 
     </application>
 </manifest>
