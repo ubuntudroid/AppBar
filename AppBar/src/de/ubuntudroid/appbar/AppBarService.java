@@ -4,12 +4,15 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import de.ubuntudroid.appbar.helpers.SystemPackages;
+
 import android.app.ActivityManager;
 import android.app.ActivityManager.RecentTaskInfo;
 import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.ComponentName;
 import android.content.Intent;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.graphics.Bitmap;
@@ -39,7 +42,6 @@ public class AppBarService extends Service {
 		super.onCreate();
 	}
 	
-	@SuppressWarnings("static-access")
 	@Override
 	public void onStart(Intent intent, int startId) {
 		super.onStart(intent, startId);
@@ -50,7 +52,7 @@ public class AppBarService extends Service {
 				while(true){
 					reloadNotification();
 					try {
-						Thread.currentThread().sleep(3000);
+						Thread.sleep(3000);
 					} catch (InterruptedException e) {
 						e.printStackTrace();
 					}
@@ -120,13 +122,22 @@ public class AppBarService extends Service {
 			Intent baseIntent = rti.baseIntent;
 			if (baseIntent != null){
 				Set<String> categories = baseIntent.getCategories();
-				if ((categories != null && categories.contains(Intent.CATEGORY_LAUNCHER)) || (baseIntent.getAction() != null && baseIntent.getAction().equals("android.settings.SETTINGS"))){
+				if ((categories != null && categories.contains(Intent.CATEGORY_LAUNCHER)) || 
+						checkForSystemApp(baseIntent)){
 					fiveRecentTasks.add(rti);
 					i++;
 				}
 			}
 		}
 		return fiveRecentTasks;
+	}
+
+	private boolean checkForSystemApp(Intent intent) {
+		if (intent.getComponent() == null){
+			return false;
+		}
+		
+		return SystemPackages.isSystemPackage(intent.getComponent().getPackageName());
 	}
 
 	private List<Bitmap> getRecentTaskIcons(List<RecentTaskInfo> recentTasks) {
