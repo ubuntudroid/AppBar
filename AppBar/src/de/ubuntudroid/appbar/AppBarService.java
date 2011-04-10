@@ -55,7 +55,6 @@ public class AppBarService extends Service {
 		resIds.add(R.id.app3);
 		resIds.add(R.id.app4);
 		resIds.add(R.id.app5);
-		//this.setForeground(true);
 		super.onCreate();
 	}
 	
@@ -79,11 +78,6 @@ public class AppBarService extends Service {
 	}
 
 	private void prepareButtonBitmaps(AppBarNotification appBarNotification, Collection<Bitmap> appIcons) {
-//		int apps = appIcons.size();
-//		if (apps == 0){
-//			return;
-//		}
-		
 		Iterator<Bitmap> iconIt = appIcons.iterator();
 		Iterator<Integer> resIt = resIds.iterator();
 		while (iconIt.hasNext()){
@@ -92,11 +86,6 @@ public class AppBarService extends Service {
 	}
 	
 	private void prepareButtonClickListeners(AppBarNotification appBarNotification, Collection<PendingIntent> appPendingIntents) {
-//		int apps = appPendingIntents.size();
-//		if (apps == 0){
-//			return;
-//		}
-		
 		Iterator<PendingIntent> piIt = appPendingIntents.iterator();
 		Iterator<Integer> resIt = resIds.iterator();
 		while (piIt.hasNext()){
@@ -117,12 +106,6 @@ public class AppBarService extends Service {
 			
 			Intent baseIntent = new Intent(rti.baseIntent);
 			if (baseIntent != null){
-//				Set<String> categories = baseIntent.getCategories();
-//				if ((categories != null && categories.contains(Intent.CATEGORY_LAUNCHER)) || 
-//						checkForSystemApp(baseIntent)){
-//					fiveRecentTasks.add(rti);
-//					i++;
-//				}
 				if (rti.origActivity != null){
 					baseIntent.setComponent(rti.origActivity);
 				}
@@ -154,49 +137,11 @@ public class AppBarService extends Service {
 		return fiveRecentTasks;
 	}
 
-	private boolean checkForSystemApp(Intent intent) {
-		if (intent.getComponent() == null){
-			return false;
-		}
-		
-		return SystemPackages.isSystemPackage(intent.getComponent().getPackageName());
-	}
-
-	private List<Bitmap> getRecentTaskIcons(List<RecentTaskInfo> recentTasks) {
-		List<Bitmap> icons = new ArrayList<Bitmap>();
-		for (RecentTaskInfo rti : recentTasks){
-			try {
-				icons.add(((BitmapDrawable) getPackageManager().getApplicationIcon(rti.baseIntent.getComponent().getPackageName())).getBitmap());
-			} catch (NameNotFoundException e) {
-				// TODO Auto-generated catch block
-				e.printStackTrace();
-			}
-		}
-		return icons;
-	}
-
-//	private List<PendingIntent> getRecentTaskPendingIntents(Set<Intent> recentTasks) {
-//		List<PendingIntent> appPendingIntents = new ArrayList<PendingIntent>();
-//		int i = 0;
-//		for (RecentTaskInfo rti : recentTasks){
-//			Intent baseIntent = rti.baseIntent;
-//			//TODO: don't restart app but just bring it to front
-////			baseIntent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
-////			baseIntent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP);
-//			baseIntent.setFlags(Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY);
-//			appPendingIntents.add(PendingIntent.getActivity(getApplicationContext(), 0, baseIntent, 0));
-//			i++;
-//		}
-//		return appPendingIntents;
-//	}
-	
 	private void reloadNotification() {
 		Log.v("AppBar", "Reloading running app list...");
 		
 		List<RecentTaskInfo> recentTasks = am.getRecentTasks(50, 0x0002);
 		Map<PendingIntent, Bitmap> fiveRecentTasks = getFiveRecentTasks(recentTasks);
-//		List<Bitmap> appIcons = getRecentTaskIcons(fiveRecentTasks);
-//		List<PendingIntent> appPendingIntents = getRecentTaskPendingIntents(fiveRecentTasks.keySet());
 		
 		AppBarNotification appBarNotification = new AppBarNotification(getPackageName(), R.layout.app_bar_notification);
 		prepareButtonBitmaps(appBarNotification, fiveRecentTasks.values());
