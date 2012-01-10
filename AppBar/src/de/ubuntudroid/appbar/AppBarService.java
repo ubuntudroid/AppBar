@@ -33,6 +33,7 @@ public class AppBarService extends Service {
 	private NotificationManager nm;
 	private ActivityManager am;
 	private PackageManager pm;
+	private long firstNotificationTime = -1;
 	
 	private final Vector<Integer> resIds = new Vector<Integer>();
 
@@ -156,6 +157,12 @@ public class AppBarService extends Service {
 		PendingIntent contentIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
 		notification.contentIntent = contentIntent;
 		notification.icon = R.drawable.icon;
+		
+		if (firstNotificationTime == -1) {
+			firstNotificationTime = System.currentTimeMillis();
+		}
+		notification.when = firstNotificationTime;
+		
 		//TODO: no icon
 		nm.notify(APP_BAR_NOTIFICATION, notification);
 	}
