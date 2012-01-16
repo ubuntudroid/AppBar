@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="hello">Hello World, AppBarConfigActivity!</string>
+    <string name="hello">The AppBar Service is now started and will eventually be automatically started after the phone has been booted or unlocked.</string>
     <string name="app_name">AppBar</string>
 </resources>

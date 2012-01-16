@@ -1,14 +1,14 @@
 package de.ubuntudroid.appbar;
 
-import java.util.ArrayList;
+import java.lang.reflect.Method;
 import java.util.Collection;
-import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Vector;
+import java.util.concurrent.locks.ReentrantLock;
 
 import android.app.ActivityManager;
 import android.app.ActivityManager.RecentTaskInfo;
@@ -22,21 +22,33 @@ import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
 import android.graphics.Bitmap;
 import android.graphics.drawable.BitmapDrawable;
-import android.graphics.drawable.Drawable;
 import android.os.IBinder;
 import android.util.Log;
-import de.ubuntudroid.appbar.helpers.SystemPackages;
 
 public class AppBarService extends Service {
 
+	public static final String START_ACTIVITY_INTENT = "de.ubuntudroid.appbar.START_ACTIVITY_INTENT";
+	public static final String ACTIVITY_ID_EXTRA = "de.ubuntudroid.appbar.ACTIVITY_ID_EXTRA"; 
+	
 	private static final int APP_BAR_NOTIFICATION = 0;
+	
 	private NotificationManager nm;
 	private ActivityManager am;
 	private PackageManager pm;
 	private long firstNotificationTime = -1;
+	private Map<Integer, Intent> buttonIntents = new LinkedHashMap<Integer, Intent>();
+	
+	private static AppBarService instance;
 	
 	private final Vector<Integer> resIds = new Vector<Integer>();
+	
+	private ReentrantLock updateNotificationLock = new ReentrantLock();
 
+
+	public static AppBarService getInstance() {
+		return instance;
+	}
+	
 	@Override
 	public IBinder onBind(Intent intent) {
 		/* not implemented as other Activities/Apps should not be able to connect to this service
@@ -47,6 +59,7 @@ public class AppBarService extends Service {
 	
 	@Override
 	public void onCreate() {
+		instance = this;
 		nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 		am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
 		pm = (PackageManager) getPackageManager();
@@ -62,6 +75,10 @@ public class AppBarService extends Service {
 	@Override
 	public void onStart(Intent intent, int startId) {
 		super.onStart(intent, startId);
+		startNotificationUpdater();
+	}
+	
+	private void startNotificationUpdater() {
 		new Thread(new Runnable() {
 			
 			@Override
@@ -80,53 +97,59 @@ public class AppBarService extends Service {
 
 	private void prepareButtonBitmaps(AppBarNotification appBarNotification, Collection<Bitmap> appIcons) {
 		Iterator<Bitmap> iconIt = appIcons.iterator();
-		Iterator<Integer> resIt = resIds.iterator();
+		Iterator<Integer> resIt = buttonIntents.keySet().iterator();
 		while (iconIt.hasNext()){
 			appBarNotification.setImageViewBitmap(resIt.next(), iconIt.next());
 		}
 	}
 	
-	private void prepareButtonClickListeners(AppBarNotification appBarNotification, Collection<PendingIntent> appPendingIntents) {
-		Iterator<PendingIntent> piIt = appPendingIntents.iterator();
-		Iterator<Integer> resIt = resIds.iterator();
-		while (piIt.hasNext()){
-			appBarNotification.setOnClickPendingIntent(resIt.next(), piIt.next());
+	private void prepareButtonClickListeners(AppBarNotification appBarNotification) {
+		Iterator<Integer> resIt = buttonIntents.keySet().iterator();
+		
+		while (resIt.hasNext()){
+			Integer resId = resIt.next();
+			appBarNotification.setOnClickPendingIntent(resId, PendingIntent.getBroadcast(getApplicationContext(), resId, new Intent().putExtra(ACTIVITY_ID_EXTRA, resId).setAction(START_ACTIVITY_INTENT), 0));
 		}
 	}
 
-	private Map<PendingIntent, Bitmap> getFiveRecentTasks(List<RecentTaskInfo> recentTasks) {
-		Map<PendingIntent, Bitmap> fiveRecentTasks = new LinkedHashMap<PendingIntent, Bitmap>();
+	private List<Bitmap> getFiveRecentTaskBitmapsAndUpdateButtonIntents(List<RecentTaskInfo> recentTasks) {
+		List<Bitmap> fiveRecentTaskBitmaps = new LinkedList<Bitmap>();
+		buttonIntents.clear();
 		
         ActivityInfo homeInfo = new Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_HOME).resolveActivityInfo(pm, 0);
 		
 		int i = 0;
 		for (RecentTaskInfo rti: recentTasks){
 			if (i > 4){
-				return fiveRecentTasks;
+				return fiveRecentTaskBitmaps;
 			}
 			
 			Intent baseIntent = new Intent(rti.baseIntent);
+			
+			if (baseIntent.getAction() == null) {
+				continue;
+			}
+			
 			if (baseIntent != null){
 				if (rti.origActivity != null){
 					baseIntent.setComponent(rti.origActivity);
 				}
 				if (homeInfo != null) {
-	                if (homeInfo.packageName.equals(
-	                        baseIntent.getComponent().getPackageName())
-	                        && homeInfo.name.equals(
-	                                baseIntent.getComponent().getClassName())) {
+	                if (homeInfo.packageName.equals(baseIntent.getComponent().getPackageName())
+	                        && homeInfo.name.equals(baseIntent.getComponent().getClassName())) {
 	                    continue;
 	                }
 	            }
 				baseIntent.setFlags((baseIntent.getFlags()&~Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
 	                    | Intent.FLAG_ACTIVITY_NEW_TASK);
 				baseIntent.addFlags(Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY);
-				PendingIntent pi = PendingIntent.getActivity(getApplicationContext(), 0, baseIntent, 0);
+				
+				buttonIntents.put(resIds.get(i), baseIntent);
 				
 				Bitmap icon;
 				try {
 					icon = ((BitmapDrawable) pm.getApplicationIcon(rti.baseIntent.getComponent().getPackageName())).getBitmap();
-					fiveRecentTasks.put(pi, icon);
+					fiveRecentTaskBitmaps.add(icon);
 					i++;
 				} catch (NameNotFoundException e) {
 					// TODO Auto-generated catch block
@@ -135,18 +158,19 @@ public class AppBarService extends Service {
 				
 			}
 		}
-		return fiveRecentTasks;
+		return fiveRecentTaskBitmaps;
 	}
 
 	private void reloadNotification() {
+		updateNotificationLock.lock();
 		Log.v("AppBar", "Reloading running app list...");
 		
 		List<RecentTaskInfo> recentTasks = am.getRecentTasks(50, 0x0002);
-		Map<PendingIntent, Bitmap> fiveRecentTasks = getFiveRecentTasks(recentTasks);
+		List<Bitmap> fiveRecentTasksBitmaps = getFiveRecentTaskBitmapsAndUpdateButtonIntents(recentTasks);
 		
 		AppBarNotification appBarNotification = new AppBarNotification(getPackageName(), R.layout.app_bar_notification);
-		prepareButtonBitmaps(appBarNotification, fiveRecentTasks.values());
-		prepareButtonClickListeners(appBarNotification, fiveRecentTasks.keySet());
+		prepareButtonBitmaps(appBarNotification, fiveRecentTasksBitmaps);
+		prepareButtonClickListeners(appBarNotification);
 		
 		Notification notification = new Notification();
 		notification.contentView = appBarNotification;
@@ -165,5 +189,27 @@ public class AppBarService extends Service {
 		
 		//TODO: no icon
 		nm.notify(APP_BAR_NOTIFICATION, notification);
+		updateNotificationLock.unlock();
 	}
+	
+	public void collapseStatusBar() {
+		try {
+			Object service = this.getSystemService("statusbar"); 
+			Class <?> statusBarManager = Class.forName("android.app.StatusBarManager"); 
+			Method collapse = statusBarManager.getMethod("collapse"); 
+			collapse.invoke (service); 
+		} catch (Exception e) {
+			e.printStackTrace();
+		} 
+	}
+	
+	public void startActivity(int appId) {
+		updateNotificationLock.lock();
+		if (appId != -1) {
+			startActivity(buttonIntents.get(appId));
+			collapseStatusBar();
+		}
+		updateNotificationLock.unlock();
+	}
+	
 }
