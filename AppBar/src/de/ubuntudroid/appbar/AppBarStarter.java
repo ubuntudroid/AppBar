@@ -11,10 +11,12 @@ public class AppBarStarter extends BroadcastReceiver {
 	public void onReceive(Context context, Intent intent) {
 		Log.i("AppBar", "received intent " + intent.getAction());
 		if (intent.getAction() != null){
+			Intent serviceIntent = new Intent();
+			serviceIntent.setAction("de.ubuntudroid.appbar.AppBarService");
 			if (intent.getAction().equals(Intent.ACTION_BOOT_COMPLETED)||intent.getAction().equals(Intent.ACTION_USER_PRESENT)){
-				Intent serviceIntent = new Intent();
-				serviceIntent.setAction("de.ubuntudroid.appbar.AppBarService");
-				context.startService(serviceIntent);
+				if (AppBarService.getInstance() != null) {
+					context.startService(serviceIntent);
+				}
 			} else if (intent.getAction().equals(AppBarService.START_ACTIVITY_INTENT)){
 				AppBarService.getInstance().startActivity(intent.getIntExtra(AppBarService.ACTIVITY_ID_EXTRA, -1));
 			}
