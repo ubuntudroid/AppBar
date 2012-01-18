@@ -13,7 +13,7 @@
         <receiver android:name="de.ubuntudroid.appbar.AppBarStarter" android:enabled="true" android:label="AppBarStarter">
         	<intent-filter>
 				<action android:name="android.intent.action.BOOT_COMPLETED"/>
-				<action android:name="android.intent.action.USER_PRESENT"/>
+				<!-- <action android:name="android.intent.action.USER_PRESENT"/> -->
 				<category android:name="android.intent.category.HOME" />
             </intent-filter>
             <intent-filter >

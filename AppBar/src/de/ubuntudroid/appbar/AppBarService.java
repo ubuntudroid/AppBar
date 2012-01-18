@@ -39,7 +39,7 @@ public class AppBarService extends Service {
 	private PackageManager pm;
 	private long firstNotificationTime = -1;
 	private Map<Integer, Intent> buttonIntents = new LinkedHashMap<Integer, Intent>();
-	private BroadcastReceiver screenOffBroadcastReceiver;
+	private BroadcastReceiver screenStateChangedBroadcastReceiver;
 	
 	private static AppBarService instance;
 	
@@ -78,29 +78,27 @@ public class AppBarService extends Service {
 		
 		// register receiver that handles screen on and screen off logic
         IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_OFF);
-        screenOffBroadcastReceiver = new ScreenOffBroadcastReceiver();
-        
-        registerReceiver(screenOffBroadcastReceiver, filter);
-        
+        filter.addAction(Intent.ACTION_SCREEN_ON);
+        screenStateChangedBroadcastReceiver = new ScreenBroadcastReceiver();
+        registerReceiver(screenStateChangedBroadcastReceiver, filter);
 	}
 	
 	@Override
 	public void onStart(Intent intent, int startId) {
 		super.onStart(intent, startId);
-		startNotificationUpdaterThread();
+		startNotificationUpdating();
 	}
 	
 	@Override
 	public void onDestroy() {
-		stopNotificationUpdaterThread();
-		unregisterReceiver(screenOffBroadcastReceiver);
-		nm.cancel(APP_BAR_NOTIFICATION);
+		stopNotificationUpdating();
+		unregisterReceiver(screenStateChangedBroadcastReceiver);
 		super.onDestroy();
 	}
 	
-	private synchronized void startNotificationUpdaterThread() {
+	public synchronized void startNotificationUpdating() {
 		if (notificationUpdaterThread != null) {
-			stopNotificationUpdaterThread();
+			stopNotificationUpdating();
 		}
 		notificationUpdaterThread = new Thread(new Runnable() {
 			
@@ -119,12 +117,13 @@ public class AppBarService extends Service {
 		notificationUpdaterThread.start();
 	}
 	
-	private synchronized void stopNotificationUpdaterThread() {
+	public synchronized void stopNotificationUpdating() {
 		if (notificationUpdaterThread != null) {
 			Thread toBeKilled = notificationUpdaterThread;
 			notificationUpdaterThread = null;
 			toBeKilled.interrupt();
 		}
+		nm.cancel(APP_BAR_NOTIFICATION);
 	}
 
 	private void prepareButtonBitmaps(AppBarNotification appBarNotification, Collection<Bitmap> appIcons) {
