@@ -16,7 +16,9 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.BroadcastReceiver;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.pm.ActivityInfo;
 import android.content.pm.PackageManager;
 import android.content.pm.PackageManager.NameNotFoundException;
@@ -37,6 +39,7 @@ public class AppBarService extends Service {
 	private PackageManager pm;
 	private long firstNotificationTime = -1;
 	private Map<Integer, Intent> buttonIntents = new LinkedHashMap<Integer, Intent>();
+	private BroadcastReceiver screenStateChangedBroadcastReceiver;
 	
 	private static AppBarService instance;
 	
@@ -44,6 +47,7 @@ public class AppBarService extends Service {
 	
 	private ReentrantLock updateNotificationLock = new ReentrantLock();
 
+	private volatile Thread notificationUpdaterThread;
 
 	public static AppBarService getInstance() {
 		return instance;
@@ -59,6 +63,8 @@ public class AppBarService extends Service {
 	
 	@Override
 	public void onCreate() {
+		super.onCreate();
+		
 		instance = this;
 		nm = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
 		am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
@@ -69,30 +75,55 @@ public class AppBarService extends Service {
 		resIds.add(R.id.app3);
 		resIds.add(R.id.app4);
 		resIds.add(R.id.app5);
-		super.onCreate();
+		
+		// register receiver that handles screen on and screen off logic
+        IntentFilter filter = new IntentFilter(Intent.ACTION_SCREEN_OFF);
+        filter.addAction(Intent.ACTION_SCREEN_ON);
+        screenStateChangedBroadcastReceiver = new ScreenBroadcastReceiver();
+        registerReceiver(screenStateChangedBroadcastReceiver, filter);
 	}
 	
 	@Override
 	public void onStart(Intent intent, int startId) {
 		super.onStart(intent, startId);
-		startNotificationUpdater();
+		startNotificationUpdating();
 	}
 	
-	private void startNotificationUpdater() {
-		new Thread(new Runnable() {
+	@Override
+	public void onDestroy() {
+		stopNotificationUpdating();
+		unregisterReceiver(screenStateChangedBroadcastReceiver);
+		super.onDestroy();
+	}
+	
+	public synchronized void startNotificationUpdating() {
+		if (notificationUpdaterThread != null) {
+			stopNotificationUpdating();
+		}
+		notificationUpdaterThread = new Thread(new Runnable() {
 			
 			@Override
 			public void run() {
-				while(true){
+				while(Thread.currentThread() == notificationUpdaterThread){
 					reloadNotification();
 					try {
 						Thread.sleep(3000);
 					} catch (InterruptedException e) {
-						e.printStackTrace();
+						// we expect exceptions here if service is destroyed on screen off
 					}
 				}
 			}
-		}).start();
+		});
+		notificationUpdaterThread.start();
+	}
+	
+	public synchronized void stopNotificationUpdating() {
+		if (notificationUpdaterThread != null) {
+			Thread toBeKilled = notificationUpdaterThread;
+			notificationUpdaterThread = null;
+			toBeKilled.interrupt();
+		}
+		nm.cancel(APP_BAR_NOTIFICATION);
 	}
 
 	private void prepareButtonBitmaps(AppBarNotification appBarNotification, Collection<Bitmap> appIcons) {
