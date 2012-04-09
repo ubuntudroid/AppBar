@@ -231,7 +231,7 @@ public class AppBarService extends Service {
 		Intent notificationIntent = new Intent();
 		PendingIntent contentIntent = PendingIntent.getActivity(this, 0, notificationIntent, 0);
 		notification.contentIntent = contentIntent;
-		notification.icon = R.drawable.icon;
+		notification.icon = R.drawable.ic_stat_notify_icon;
 		
 		if (firstNotificationTime == -1) {
 			firstNotificationTime = System.currentTimeMillis();
